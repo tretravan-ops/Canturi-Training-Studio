@@ -1,0 +1,287 @@
+'use client'
+
+import { useState } from 'react'
+import { X, Clock, Users } from 'lucide-react'
+import { CategoryBadge } from './CategoryBadge'
+import { StarRating } from './StarRating'
+import { CelebrationScreen } from './CelebrationScreen'
+import { createClient } from '@/lib/supabase/client'
+import type { MenuItem, Plate, Completion, User } from '@/types'
+
+interface Props {
+  item: MenuItem
+  plate?: Plate | null
+  existingCompletion?: Completion | null
+  currentUser: User
+  mode: 'trainee' | 'manager'
+  onClose: () => void
+  onComplete?: () => void
+}
+
+export function TaskModal({ item, plate, existingCompletion, currentUser, mode, onClose, onComplete }: Props) {
+  const [traineeNotes, setTraineeNotes] = useState(existingCompletion?.trainee_notes ?? '')
+  const [trainerNotes, setTrainerNotes] = useState(existingCompletion?.trainer_notes ?? '')
+  const [traineeRating, setTraineeRating] = useState(existingCompletion?.trainee_rating ?? 0)
+  const [trainerRating, setTrainerRating] = useState(existingCompletion?.trainer_rating ?? 0)
+  const [submitting, setSubmitting] = useState(false)
+  const [celebrating, setCelebrating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const isCompleted = !!existingCompletion
+  const isShadowing = !plate
+
+  const supabase = createClient()
+
+  async function handleTraineeComplete() {
+    if (traineeRating === 0) {
+      setError('Please give yourself a rating before completing.')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+
+    const completionData = {
+      plate_id: plate?.id ?? null,
+      menu_item_id: item.id,
+      trainee_id: currentUser.id,
+      trainee_notes: traineeNotes || null,
+      trainee_rating: traineeRating,
+      completed_date: new Date().toISOString().split('T')[0],
+      is_shadowing_moment: isShadowing,
+    }
+
+    const { error } = existingCompletion
+      ? await supabase.from('completions').update(completionData).eq('id', existingCompletion.id)
+      : await supabase.from('completions').insert(completionData)
+
+    if (error) {
+      setError('Something went wrong. Please try again.')
+      setSubmitting(false)
+      return
+    }
+
+    setCelebrating(true)
+  }
+
+  async function handleManagerSignOff() {
+    if (!existingCompletion) return
+    setSubmitting(true)
+    setError(null)
+
+    const { error } = await supabase
+      .from('completions')
+      .update({
+        trainer_id: currentUser.id,
+        trainer_notes: trainerNotes || null,
+        trainer_rating: trainerRating || null,
+      })
+      .eq('id', existingCompletion.id)
+
+    if (error) {
+      setError('Something went wrong. Please try again.')
+      setSubmitting(false)
+      return
+    }
+
+    onComplete?.()
+    onClose()
+  }
+
+  if (celebrating) {
+    return (
+      <CelebrationScreen
+        traineeName={currentUser.name}
+        taskTitle={item.title}
+        onContinue={() => {
+          setCelebrating(false)
+          onComplete?.()
+          onClose()
+        }}
+      />
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-charcoal/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-white w-full sm:max-w-lg sm:mx-4 sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-black/5 px-5 py-4 flex items-start justify-between rounded-t-2xl">
+          <div className="flex-1 pr-4">
+            {item.category && (
+              <CategoryBadge
+                categoryName={item.category.name}
+                icon={item.category.icon}
+              />
+            )}
+            <h2 className="font-serif text-xl text-charcoal mt-2 leading-tight">{item.title}</h2>
+          </div>
+          <button onClick={onClose} className="text-charcoal/40 hover:text-charcoal p-1 -mt-1 -mr-1 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-5 py-5 space-y-5">
+          {/* Meta */}
+          <div className="flex items-center gap-4 text-sm text-charcoal/50">
+            <span className="flex items-center gap-1.5">
+              <Clock size={14} />
+              {item.time_needed}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Users size={14} />
+              {item.trainer_type}
+            </span>
+            {isShadowing && (
+              <span className="text-gold text-xs font-medium bg-gold/10 px-2 py-0.5 rounded-full">
+                Shadowing moment
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          <p className="text-charcoal/70 leading-relaxed text-sm">{item.description}</p>
+
+          {/* Tags */}
+          {item.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {item.tags.map(tag => (
+                <span
+                  key={tag}
+                  className="text-xs text-charcoal/40 bg-charcoal/5 px-2 py-0.5 rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="h-px bg-black/5" />
+
+          {/* TRAINEE MODE */}
+          {mode === 'trainee' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-charcoal/50 uppercase tracking-wider mb-2">
+                  Notes & observations
+                </label>
+                <textarea
+                  className="textarea"
+                  rows={3}
+                  value={traineeNotes}
+                  onChange={e => setTraineeNotes(e.target.value)}
+                  placeholder="What did you observe? Any questions to follow up on?"
+                  disabled={isCompleted}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-charcoal/50 uppercase tracking-wider mb-2">
+                  How confident do you feel?
+                </label>
+                <StarRating
+                  value={traineeRating}
+                  onChange={isCompleted ? undefined : setTraineeRating}
+                  readonly={isCompleted}
+                  size="lg"
+                />
+              </div>
+
+              {isCompleted ? (
+                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-4 py-3 rounded-xl">
+                  <span>✓</span>
+                  <span>Completed {existingCompletion?.completed_date}</span>
+                </div>
+              ) : (
+                <>
+                  {error && <p className="text-sm text-red-600">{error}</p>}
+                  <button
+                    onClick={handleTraineeComplete}
+                    disabled={submitting || traineeRating === 0}
+                    className="btn-gold w-full"
+                  >
+                    {submitting ? 'Saving…' : isShadowing ? 'Log shadowing moment' : 'Mark as complete'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* MANAGER MODE */}
+          {mode === 'manager' && (
+            <div className="space-y-4">
+              {/* Show trainee's notes (read-only) */}
+              {existingCompletion?.trainee_notes && (
+                <div>
+                  <label className="block text-xs font-medium text-charcoal/50 uppercase tracking-wider mb-2">
+                    Trainee notes
+                  </label>
+                  <p className="text-sm text-charcoal/70 bg-ivory px-4 py-3 rounded-xl">
+                    {existingCompletion.trainee_notes}
+                  </p>
+                </div>
+              )}
+
+              {existingCompletion?.trainee_rating && (
+                <div>
+                  <label className="block text-xs font-medium text-charcoal/50 uppercase tracking-wider mb-2">
+                    Trainee self-rating
+                  </label>
+                  <StarRating value={existingCompletion.trainee_rating} readonly size="md" />
+                </div>
+              )}
+
+              {existingCompletion && (
+                <>
+                  <div className="h-px bg-black/5" />
+
+                  <div>
+                    <label className="block text-xs font-medium text-charcoal/50 uppercase tracking-wider mb-2">
+                      Your notes (not visible to trainee)
+                    </label>
+                    <textarea
+                      className="textarea"
+                      rows={3}
+                      value={trainerNotes}
+                      onChange={e => setTrainerNotes(e.target.value)}
+                      placeholder="Coaching notes, observations, areas to develop…"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-charcoal/50 uppercase tracking-wider mb-2">
+                      Your assessment (not visible to trainee)
+                    </label>
+                    <StarRating value={trainerRating} onChange={setTrainerRating} size="md" />
+                  </div>
+
+                  {error && <p className="text-sm text-red-600">{error}</p>}
+
+                  <button
+                    onClick={handleManagerSignOff}
+                    disabled={submitting}
+                    className="btn-gold w-full"
+                  >
+                    {submitting ? 'Saving…' : 'Save assessment'}
+                  </button>
+                </>
+              )}
+
+              {!existingCompletion && (
+                <div className="text-sm text-charcoal/40 text-center py-2">
+                  This item hasn&apos;t been completed by the trainee yet.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

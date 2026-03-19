@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ivory: #FAF8F4;
+  --charcoal: #1C1C1C;
+  --gold: #C9A96E;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--ivory);
+  color: var(--charcoal);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+@layer components {
+  .btn-gold {
+    @apply bg-gold text-white font-medium px-6 py-3 rounded-lg hover:bg-gold-dark transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply border border-charcoal/20 text-charcoal font-medium px-6 py-3 rounded-lg hover:border-charcoal/40 hover:bg-charcoal/5 transition-colors duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-black/5;
+  }
+
+  .page-header {
+    @apply bg-charcoal text-white px-6 py-4 flex items-center justify-between;
+  }
+
+  .category-badge {
+    @apply text-xs font-medium px-2.5 py-1 rounded-full;
+  }
+
+  .star-rating {
+    @apply text-gold text-xl cursor-pointer select-none;
+  }
+
+  .input {
+    @apply w-full border border-black/15 rounded-xl px-4 py-3 text-charcoal placeholder:text-charcoal/40 focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold/50 transition-all;
+  }
+
+  .textarea {
+    @apply w-full border border-black/15 rounded-xl px-4 py-3 text-charcoal placeholder:text-charcoal/40 focus:outline-none focus:ring-2 focus:ring-gold/30 focus:border-gold/50 transition-all resize-none;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #C9A96E40;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C9A96E80;
+}
+
+/* Celebration confetti canvas */
+#confetti-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
